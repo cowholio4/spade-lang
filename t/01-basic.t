@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 use Test::More;
 
-
+use Data::Dumper::Simple;
 use Spade::Template;
 
 my $t = Spade::Template->new();
@@ -14,9 +14,15 @@ is( $output, "");
 
 $input = "div";
 $output = $t->process( $input );
-is( $output, "<div></div>");
+is( $$output, "<div></div>");
 
 
 $input = "span";
 $output = $t->process( $input );
-is( $output, "<span></span>");
+is( $$output, "<span></span>");
+
+# named tag
+#$input = "span#test";
+
+#$output = $t->process( $input );
+#is( $$output, "<span></span>");
