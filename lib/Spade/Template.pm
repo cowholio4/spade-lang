@@ -44,12 +44,15 @@ sub process {
   while (length($text)) {
     
     no warnings;
+    print "text\t$text\n";
 #    $text =~ s{\A \s* // .*? ^}{}xms and next;
 #    $text =~ s{\A \s* (/\* .*? \*/) \s*}{ $t->(COMMENT => $1 ) }exms and next;
 #    $text =~ s{\A \s* \@([a-z]+) \s*}{ $t->("AT_\U$1") }exms and next;
 #    $text =~ s{\A \s* (['"]) ((?:[^\\\1] | \\.)*?) \1 \s*}{ $t->(STRING => $2) }exms and next;
-#    $text =~ s{\A \s+ }{ $t->('SPACE') }exms and next;
-    $text =~ s{\A \s* (-?[_a-zA-Z][-_a-zA-Z0-9]*)}{$t->(TAG => $1)}exms and next;
+    $text =~ s{\A \s+ }{ $t->('SPACE') }exms and next;
+    $text =~ s{\A([\w\-]+)}{$t->(TAG => $1)}exms and next;
+    $text =~ s{\A"([\w\-]+)"}{$t->(TERM => $1)}exms and next;
+    $text =~ s{\A'([\w\-]+)'}{$t->(TERM => $1)}exms and next;
 #    $text =~ s{\A \s* (\.\d+ | \d+ (?:\.\d*)?) \s* (%|em|ex|px|cm|mm|pt|pc|deg|rad|grad|ms|s|hz|khz)? \s*}{ $t->(NUMBER => "$1$2") }exms and next;
     
     my $char = substr($text,0,1,'');
@@ -88,7 +91,7 @@ sub get_grammar {
 
 
   my $grammar = Marpa::R2::Grammar->new(
-    { start     => 'expression',
+    { start     => 'EXPRESSION',
       actions   => 'Spade::Template',
       default_action  => 'do_default', 
       terminals => [qw(
@@ -98,9 +101,17 @@ sub get_grammar {
         AT_CHARSET AT_IMPORT AT_MEDIA AT_PAGE IMPORTANT
       )], 
       rules => [
-        { lhs => 'expression', rhs => [ qw(TAG) ], action => "do_tag" },
+        { lhs => 'EXPRESSION', rhs => [ qw(TAG) ], action => "do_tag" },
+        { lhs => 'EXPRESSION', rhs => [ qw(TAG HASH TAG) ], action => "do_tag_id" },
+        { lhs => 'EXPRESSION', rhs => [ qw(TAG DOT TAG) ], action => "do_tag_class" },
+        { lhs => 'EXPRESSION', rhs => [ qw(HASH TAG) ], action => "do_implicit_tag_id" },
+        { lhs => 'EXPRESSION', rhs => [ qw(DOT TAG) ], action => "do_implicit_tag_class" },
 
-          
+#:        { lhs => 'TAG', rhs => [ qw(STRING) ]  },
+#        { lhs => 'TAG', rhs => [ qw(STRING SPECIALIZERS STRING) ], action => "do_tag" },
+#        { lhs => 'SPECIALIZERS', rhs => [ qw(SPECIALIZER) ] },
+#        { lhs => 'SPECIALIZER', rhs => [ qw(HASH) ] },
+        
       ]
     
      }
@@ -112,16 +123,35 @@ sub get_grammar {
 
 }
 
+
 sub do_tag {
   my ($this, $tag ) = @_;
+  print Dumper( @_ );
   return "<$tag></$tag>";
-    
- 
+}
+sub do_tag_id {
+  my ($this, $tag, undef, $id ) = @_;
+  return "<$tag id='$id'></$tag>";
+}
+sub do_tag_class {
+  my ($this, $tag, undef, $class ) = @_;
+  return "<$tag class='$class'></$tag>";
+}
+sub do_implicit_tag_class {
+  my ($this, undef, $class ) = @_;
+  return "<div class='$class'></div>";
+}
+sub do_implicit_tag_id {
+  my ($this, undef, $id ) = @_;
+  return "<div id='$id'></div>";
 }
 
+
+
 sub do_default {
-    say Dumper(@_);
-    return;
+  my ( $this, $value ) = @_;
+  print Dumper( @_);
+  return $value;
 }
 sub function_call {
     say Data::Dumper->Dump([ [@_] ],[ 'Function_Call' ]);
