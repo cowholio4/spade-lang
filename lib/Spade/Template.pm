@@ -15,7 +15,7 @@ my %symbol_for_char = (
     ',' => 'COMMA',         '.' => 'DOT',
     '*' => 'SPLASH',        '#' => 'HASH',
     '/' => 'SLASH',         '>' => 'GT',
-    '+' => 'PLUS',
+    '+' => 'PLUS',          '=' => 'EQUALS'
 );
 
 
@@ -101,11 +101,19 @@ sub get_grammar {
         AT_CHARSET AT_IMPORT AT_MEDIA AT_PAGE IMPORTANT
       )], 
       rules => [
-        { lhs => 'EXPRESSION', rhs => [ qw(TAG) ], action => "do_tag" },
-        { lhs => 'EXPRESSION', rhs => [ qw(TAG HASH TAG) ], action => "do_tag_id" },
-        { lhs => 'EXPRESSION', rhs => [ qw(TAG DOT TAG) ], action => "do_tag_class" },
-        { lhs => 'EXPRESSION', rhs => [ qw(HASH TAG) ], action => "do_implicit_tag_id" },
-        { lhs => 'EXPRESSION', rhs => [ qw(DOT TAG) ], action => "do_implicit_tag_class" },
+        { lhs => 'EXPRESSION', rhs => [ qw(ELEMENT)], action => "do_combine_tag"  },
+        { lhs => 'EXPRESSION', rhs => [ qw(ELEMENT SPACE PROPERTIES) ], action => "do_combine_tag"  },
+
+        { lhs => 'ELEMENT', rhs => [ qw(TAG HASH TAG) ], action => "do_tag_id" },
+        { lhs => 'ELEMENT', rhs => [ qw(TAG DOT TAG) ], action => "do_tag_class" },
+        { lhs => 'ELEMENT', rhs => [ qw(HASH TAG) ], action => "do_implicit_tag_id" },
+        { lhs => 'ELEMENT', rhs => [ qw(DOT TAG) ], action => "do_implicit_tag_class" },
+        { lhs => 'ELEMENT', rhs => [ qw(TAG) ], action => "do_tag" },
+
+        { lhs => 'PROPERTIES', rhs => [ qw(PROPERTY SPACE PROPERTIES) ], action => "append"  },
+        { lhs => 'PROPERTIES', rhs => [ qw(PROPERTY) ]  },
+
+        { lhs => 'PROPERTY', rhs => [ qw(TAG EQUALS TERM) ], action => "do_property" },
 
 #:        { lhs => 'TAG', rhs => [ qw(STRING) ]  },
 #        { lhs => 'TAG', rhs => [ qw(STRING SPECIALIZERS STRING) ], action => "do_tag" },
@@ -123,27 +131,58 @@ sub get_grammar {
 
 }
 
+sub append {
+  my ($this, $lhs, $delimeter, $rhs ) = @_;
+
+}
+
+
+sub do_combine_tag {
+  my ($this, $element, $delimeter, $properties ) = @_;
+  $properties ||= {};
+  my $tag   = $element->{tag};
+  my $id    = $element->{id}    || $properties->{id};
+  my $class = $element->{class} || $properties->{class};
+  my $props = "";
+  $props .= "id='$id' " if $id;
+  $props .= "class='$class' " if $class;
+  for my $key ( keys $properties ) {
+    my $value = $properties->{$key};
+    $props .= "$key='$value'";
+  }
+  $props =~ s/\s+$//;
+  my $html = "<$tag";
+  $html .= " " if( length $props > 0 );
+  return $html . "$props></$tag>";
+}
 
 sub do_tag {
   my ($this, $tag ) = @_;
+  print "do_tag\n";
   print Dumper( @_ );
-  return "<$tag></$tag>";
+  return { tag => $tag };
 }
 sub do_tag_id {
   my ($this, $tag, undef, $id ) = @_;
-  return "<$tag id='$id'></$tag>";
+  return { id => $id, tag => $tag };
 }
 sub do_tag_class {
   my ($this, $tag, undef, $class ) = @_;
-  return "<$tag class='$class'></$tag>";
+  return { class => $class, tag => $tag };
 }
 sub do_implicit_tag_class {
   my ($this, undef, $class ) = @_;
-  return "<div class='$class'></div>";
+  return { class => $class, tag => "div" };
 }
 sub do_implicit_tag_id {
   my ($this, undef, $id ) = @_;
-  return "<div id='$id'></div>";
+  return { id => $id, tag => "div" };
+}
+
+sub do_property {
+  my ($this, $prop, undef, $value ) = @_;
+  print "do_property\n";
+  return { $prop => $value };
 }
 
 
